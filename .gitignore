@@ -1,0 +1,41 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+publish/
+*.nupkg
+*.snupkg
+.nuget/
+
+## Test results
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+
+## Rider / Visual Studio / VS Code
+.vs/
+.idea/
+.vscode/
+*.DotSettings.user
+
+## Environment / secrets
+.env
+.env.*
+!.env.example
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Logs
+*.log
+logs/
+
+## Secrets / keys (defense in depth, should never exist in repo)
+*.pfx
+*.pem
+*.key
+secrets.json
+appsettings.*.local.json

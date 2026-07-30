@@ -1,0 +1,22 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.idea/
+**/.vscode/
+.git/
+.gitignore
+.dockerignore
+.env
+.env.*
+!.env.example
+*.md
+docs/
+tests/
+.github/
+
+## Secrets / keys (defense in depth, should never exist in repo)
+*.pfx
+*.pem
+*.key
+secrets.json
+appsettings.*.local.json

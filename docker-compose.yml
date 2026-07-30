@@ -1,0 +1,96 @@
+name: fixturely
+
+services:
+  fixturely-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fixturely-api
+    depends_on:
+      fixturely-sqlserver:
+        condition: service_healthy
+      fixturely-redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      AutoMigrate: "true"
+      FIXTURELY_CONNECTIONSTRINGS__DEFAULTCONNECTION: "Server=fixturely-sqlserver,1433;Database=FixturelyDb;User Id=sa;Password=${FIXTURELY_SQL_SA_PASSWORD:-Fixturely_Dev_2024!};TrustServerCertificate=True;"
+      FIXTURELY_REDIS__CONNECTIONSTRING: "fixturely-redis:6379"
+      FIXTURELY_JWT__ISSUER: "${FIXTURELY_JWT__ISSUER:-Fixturely}"
+      FIXTURELY_JWT__AUDIENCE: "${FIXTURELY_JWT__AUDIENCE:-FixturelyClient}"
+      FIXTURELY_JWT__SIGNINGKEY: "${FIXTURELY_JWT__SIGNINGKEY:-please-change-this-signing-key-in-every-environment-32chars-min}"
+      FIXTURELY_JWT__ACCESSTOKENMINUTES: "${FIXTURELY_JWT__ACCESSTOKENMINUTES:-15}"
+      FIXTURELY_JWT__REFRESHTOKENDAYS: "${FIXTURELY_JWT__REFRESHTOKENDAYS:-7}"
+      FIXTURELY_SESSION__IDLETIMEOUTMINUTES: "${FIXTURELY_SESSION__IDLETIMEOUTMINUTES:-15}"
+      FIXTURELY_FRONTEND__BASEURL: "${FIXTURELY_FRONTEND__BASEURL:-http://localhost:5173}"
+      FIXTURELY_SMTP__HOST: "${FIXTURELY_SMTP__HOST:-fixturely-mailpit}"
+      FIXTURELY_SMTP__PORT: "${FIXTURELY_SMTP__PORT:-1025}"
+      FIXTURELY_SMTP__USERNAME: "${FIXTURELY_SMTP__USERNAME:-}"
+      FIXTURELY_SMTP__PASSWORD: "${FIXTURELY_SMTP__PASSWORD:-}"
+      FIXTURELY_SMTP__FROMEMAIL: "${FIXTURELY_SMTP__FROMEMAIL:-no-reply@fixturely.local}"
+      FIXTURELY_SMTP__FROMNAME: "${FIXTURELY_SMTP__FROMNAME:-Fixturely}"
+      FIXTURELY_SMTP__USESSL: "${FIXTURELY_SMTP__USESSL:-false}"
+    networks:
+      - fixturely-network
+
+  fixturely-sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: fixturely-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${FIXTURELY_SQL_SA_PASSWORD:-Fixturely_Dev_2024!}"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - fixturely-sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"${FIXTURELY_SQL_SA_PASSWORD:-Fixturely_Dev_2024!}\" -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - fixturely-network
+
+  fixturely-redis:
+    image: redis:7-alpine
+    container_name: fixturely-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - fixturely-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - fixturely-network
+
+  fixturely-mailpit:
+    image: axllent/mailpit:latest
+    container_name: fixturely-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8025"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - fixturely-network
+
+networks:
+  fixturely-network:
+    name: fixturely-network
+
+volumes:
+  fixturely-sqlserver-data:
+    name: fixturely-sqlserver-data
+  fixturely-redis-data:
+    name: fixturely-redis-data
