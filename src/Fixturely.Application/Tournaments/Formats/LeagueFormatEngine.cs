@@ -13,7 +13,7 @@ public sealed class LeagueFormatEngine : ITournamentFormatEngine
         if (input.Participants.Count < 2)
         {
             throw new InvalidFixtureGenerationException(
-                "A league tournament requires at least two participants.");
+                ErrorCodes.LeagueMinParticipants, "A league tournament requires at least two participants.");
         }
 
         var participantIds = input.Participants.Select(p => (Guid?)p.Id).ToList();

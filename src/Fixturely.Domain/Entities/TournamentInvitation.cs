@@ -55,7 +55,8 @@ public sealed class TournamentInvitation : Entity
     {
         if (Status != InvitationStatus.Pending)
         {
-            throw new InvitationException("Only pending invitations can be resent.");
+            throw new InvitationException(
+                ErrorCodes.InvitationOnlyPendingCanResend, "Only pending invitations can be resent.");
         }
 
         TokenHash = newTokenHash;
@@ -67,7 +68,8 @@ public sealed class TournamentInvitation : Entity
     {
         if (Status != InvitationStatus.Pending)
         {
-            throw new InvitationException("Only pending invitations can be revoked.");
+            throw new InvitationException(
+                ErrorCodes.InvitationOnlyPendingCanRevoke, "Only pending invitations can be revoked.");
         }
 
         Status = InvitationStatus.Revoked;
@@ -78,14 +80,15 @@ public sealed class TournamentInvitation : Entity
     {
         if (Status != InvitationStatus.Pending)
         {
-            throw new InvitationException("This invitation is no longer valid.");
+            throw new InvitationException(
+                ErrorCodes.InvitationNoLongerValid, "This invitation is no longer valid.");
         }
 
         if (utcNow > ExpiresAtUtc)
         {
             Status = InvitationStatus.Expired;
             Touch(utcNow);
-            throw new InvitationException("This invitation has expired.");
+            throw new InvitationException(ErrorCodes.InvitationExpired, "This invitation has expired.");
         }
 
         Status = InvitationStatus.Accepted;

@@ -34,8 +34,9 @@ public sealed record BulkInviteResultItem(
     string Email,
     bool Success,
     InvitationResponse? Invitation,
-    string? Error);
+    string? Error,
+    string? ErrorCode = null);
 
 public sealed record BulkRemoveMembersRequest(IReadOnlyCollection<Guid> MemberIds);
 
-public sealed record BulkRemoveResultItem(Guid MemberId, bool Success, string? Error);
+public sealed record BulkRemoveResultItem(Guid MemberId, bool Success, string? Error, string? ErrorCode = null);

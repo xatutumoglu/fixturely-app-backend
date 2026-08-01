@@ -50,7 +50,7 @@ public sealed class AuthService
 
         if (!result.Succeeded || userId is null)
         {
-            throw new IdentityValidationException(result.Errors);
+            throw new IdentityValidationException(result.Errors, result.Codes);
         }
 
         var token = await _identityService.GenerateEmailConfirmationTokenAsync(userId.Value, cancellationToken);
@@ -65,7 +65,7 @@ public sealed class AuthService
 
         if (!result.Succeeded)
         {
-            throw new IdentityValidationException(result.Errors);
+            throw new IdentityValidationException(result.Errors, result.Codes);
         }
     }
 
@@ -269,7 +269,7 @@ public sealed class AuthService
 
         if (!result.Succeeded)
         {
-            throw new IdentityValidationException(result.Errors);
+            throw new IdentityValidationException(result.Errors, result.Codes);
         }
 
         await LogoutAllAsync(request.UserId, cancellationToken);

@@ -145,9 +145,17 @@ public sealed class ParticipantService
             var remaining = Math.Max(0, maxParticipants.Value - currentCount);
 
             throw new TournamentGroupCompositionException(
+                ErrorCodes.ParticipantCapacityExceeded,
                 $"This tournament format allows at most {maxParticipants} participants " +
                 $"({tournament.NumberOfGroups} groups x {ParticipantCapacity.ParticipantsPerGroup} participants per group). " +
-                $"You can add at most {remaining} more participant(s).");
+                $"You can add at most {remaining} more participant(s).",
+                new Dictionary<string, object?>
+                {
+                    ["maxParticipants"] = maxParticipants,
+                    ["numberOfGroups"] = tournament.NumberOfGroups,
+                    ["participantsPerGroup"] = ParticipantCapacity.ParticipantsPerGroup,
+                    ["remaining"] = remaining
+                });
         }
     }
 
@@ -164,7 +172,8 @@ public sealed class ParticipantService
             .FirstOrDefaultAsync(
                 p => p.Id == participantId && p.TournamentId == tournamentId && !p.IsDeleted,
                 cancellationToken)
-            ?? throw new InvalidTournamentStateException("Participant not found in this tournament.");
+            ?? throw new InvalidTournamentStateException(
+                ErrorCodes.ParticipantNotFound, "Participant not found in this tournament.");
 
         participant.Update(request.Name, request.ShortCode, _timeProvider.GetUtcNow().UtcDateTime);
         await _dbContext.SaveChangesAsync(cancellationToken);

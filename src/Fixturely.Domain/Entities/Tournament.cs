@@ -60,7 +60,8 @@ public sealed class Tournament : SoftDeletableEntity
     {
         if (string.IsNullOrWhiteSpace(name))
         {
-            throw new InvalidTournamentStateException("Tournament name is required.");
+            throw new InvalidTournamentStateException(
+                ErrorCodes.TournamentNameRequired, "Tournament name is required.");
         }
 
         if (format is TournamentFormat.GroupStage or TournamentFormat.GroupKnockout)
@@ -68,6 +69,7 @@ public sealed class Tournament : SoftDeletableEntity
             if (numberOfGroups is null || numberOfGroups <= 0)
             {
                 throw new InvalidTournamentStateException(
+                    ErrorCodes.NumberOfGroupsRequired,
                     "Number of groups must be provided for group-based tournament formats.");
             }
         }
@@ -110,7 +112,8 @@ public sealed class Tournament : SoftDeletableEntity
     {
         if (Status != TournamentStatus.Draft)
         {
-            throw new InvalidTournamentStateException("Only draft tournaments can move to setup.");
+            throw new InvalidTournamentStateException(
+                ErrorCodes.OnlyDraftCanMoveToSetup, "Only draft tournaments can move to setup.");
         }
 
         Status = TournamentStatus.Setup;
@@ -134,7 +137,8 @@ public sealed class Tournament : SoftDeletableEntity
         EnsureMutable();
 
         var participant = _participants.FirstOrDefault(p => p.Id == participantId)
-            ?? throw new InvalidTournamentStateException("Participant not found in this tournament.");
+            ?? throw new InvalidTournamentStateException(
+                ErrorCodes.ParticipantNotFound, "Participant not found in this tournament.");
 
         _participants.Remove(participant);
         Touch(utcNow);
@@ -166,7 +170,8 @@ public sealed class Tournament : SoftDeletableEntity
     {
         if (Status != TournamentStatus.Completed)
         {
-            throw new InvalidTournamentStateException("Only completed tournaments can be reopened.");
+            throw new InvalidTournamentStateException(
+                ErrorCodes.OnlyCompletedCanReopen, "Only completed tournaments can be reopened.");
         }
 
         Status = TournamentStatus.InProgress;
@@ -201,7 +206,7 @@ public sealed class Tournament : SoftDeletableEntity
         if (Status is TournamentStatus.Archived or TournamentStatus.Deleted)
         {
             throw new InvalidTournamentStateException(
-                "This tournament is read-only and cannot be modified.");
+                ErrorCodes.TournamentReadOnly, "This tournament is read-only and cannot be modified.");
         }
     }
 }

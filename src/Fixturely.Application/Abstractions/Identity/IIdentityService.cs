@@ -23,12 +23,25 @@ public sealed class IdentityOperationResult
 
     public IReadOnlyCollection<string> Errors { get; private init; } = Array.Empty<string>();
 
+    /// <summary>
+    /// The stable ASP.NET Core Identity error codes (e.g. "DuplicateEmail", "PasswordTooShort")
+    /// backing each entry in <see cref="Errors"/>, in the same order, so callers can render a
+    /// localized message per failure instead of the English <c>IdentityError.Description</c>.
+    /// </summary>
+    public IReadOnlyCollection<string> Codes { get; private init; } = Array.Empty<string>();
+
     public static IdentityOperationResult Success() => new() { Succeeded = true };
 
     public static IdentityOperationResult Failure(IEnumerable<string> errors) =>
         new() { Succeeded = false, Errors = errors.ToArray() };
 
+    public static IdentityOperationResult Failure(IEnumerable<string> errors, IEnumerable<string> codes) =>
+        new() { Succeeded = false, Errors = errors.ToArray(), Codes = codes.ToArray() };
+
     public static IdentityOperationResult Failure(string error) => Failure(new[] { error });
+
+    public static IdentityOperationResult Failure(string error, string code) =>
+        Failure(new[] { error }, new[] { code });
 }
 
 public interface IIdentityService

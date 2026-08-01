@@ -39,7 +39,7 @@ public sealed class KnockoutFormatEngine : ITournamentFormatEngine
         if (participantIds.Count < 2)
         {
             throw new InvalidFixtureGenerationException(
-                "A knockout tournament requires at least two participants.");
+                ErrorCodes.KnockoutMinParticipants, "A knockout tournament requires at least two participants.");
         }
 
         var bracketSize = BracketSeedOrderCalculator.NextPowerOfTwo(participantIds.Count);

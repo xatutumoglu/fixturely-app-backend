@@ -249,7 +249,8 @@ public sealed class Match : Entity
 
         if (homeScore == awayScore)
         {
-            throw new InvalidScoreException("Penalty shoot-out scores cannot be equal.");
+            throw new InvalidScoreException(
+                ErrorCodes.PenaltyScoresCannotBeEqual, "Penalty shoot-out scores cannot be equal.");
         }
 
         HomePenaltyScore = homeScore;
@@ -262,7 +263,9 @@ public sealed class Match : Entity
     {
         if (RequiresDecisiveWinner && winnerParticipantId is null && !IsBye)
         {
-            throw new InvalidScoreException("A knockout match cannot be completed without a determinable winner.");
+            throw new InvalidScoreException(
+                ErrorCodes.KnockoutMatchNoWinner,
+                "A knockout match cannot be completed without a determinable winner.");
         }
 
         WinnerParticipantId = winnerParticipantId;
@@ -323,7 +326,8 @@ public sealed class Match : Entity
     {
         if (homeScore < 0 || awayScore < 0)
         {
-            throw new InvalidScoreException("Scores must be non-negative integers.");
+            throw new InvalidScoreException(
+                ErrorCodes.ScoresMustBeNonNegative, "Scores must be non-negative integers.");
         }
     }
 }

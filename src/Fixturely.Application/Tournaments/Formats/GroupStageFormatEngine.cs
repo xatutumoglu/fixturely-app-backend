@@ -83,7 +83,8 @@ internal static class GroupDrawHelper
     {
         if (input.NumberOfGroups is null || input.NumberOfGroups <= 0)
         {
-            throw new InvalidFixtureGenerationException("Number of groups must be provided.");
+            throw new InvalidFixtureGenerationException(
+                ErrorCodes.NumberOfGroupsRequired, "Number of groups must be provided.");
         }
 
         var expectedParticipantCount = input.NumberOfGroups.Value * ParticipantsPerGroup;
@@ -91,9 +92,17 @@ internal static class GroupDrawHelper
         if (input.Participants.Count != expectedParticipantCount)
         {
             throw new TournamentGroupCompositionException(
+                ErrorCodes.GroupStageParticipantCountMismatch,
                 $"This tournament requires exactly {expectedParticipantCount} participants " +
                 $"({input.NumberOfGroups} groups x {ParticipantsPerGroup} participants per group). " +
-                $"Currently there are {input.Participants.Count}.");
+                $"Currently there are {input.Participants.Count}.",
+                new Dictionary<string, object?>
+                {
+                    ["expectedParticipantCount"] = expectedParticipantCount,
+                    ["numberOfGroups"] = input.NumberOfGroups,
+                    ["participantsPerGroup"] = ParticipantsPerGroup,
+                    ["actualParticipantCount"] = input.Participants.Count
+                });
         }
 
         var shuffledParticipantIds = SecureDraw.Shuffle(input.Participants.Select(p => p.Id), input.RandomSeed);

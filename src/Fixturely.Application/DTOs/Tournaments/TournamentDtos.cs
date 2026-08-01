@@ -17,6 +17,8 @@ public sealed record UpdateTournamentRequest(
     bool HasThirdPlaceMatch,
     byte[] RowVersion);
 
+public sealed record BulkDeleteTournamentsRequest(IReadOnlyCollection<Guid> TournamentIds);
+
 public sealed record TournamentSummaryResponse(
     Guid Id,
     string Name,

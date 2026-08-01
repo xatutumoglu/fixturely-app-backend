@@ -75,16 +75,18 @@ public sealed class MatchService
 
         if (tournament.Status is TournamentStatus.Archived or TournamentStatus.Deleted)
         {
-            throw new InvalidTournamentStateException("This tournament is read-only and cannot be modified.");
+            throw new InvalidTournamentStateException(
+                ErrorCodes.TournamentReadOnly, "This tournament is read-only and cannot be modified.");
         }
 
         var match = await _dbContext.Matches
             .FirstOrDefaultAsync(m => m.Id == matchId && m.TournamentId == tournamentId, cancellationToken)
-            ?? throw new InvalidTournamentStateException("Match not found in this tournament.");
+            ?? throw new InvalidTournamentStateException(
+                ErrorCodes.MatchNotFound, "Match not found in this tournament.");
 
         if (match.IsBye)
         {
-            throw new InvalidScoreException("BYE matches do not require score entry.");
+            throw new InvalidScoreException(ErrorCodes.ByeMatchNoScore, "BYE matches do not require score entry.");
         }
 
         _dbContext.SetOriginalRowVersion(match, request.RowVersion);
@@ -133,9 +135,15 @@ public sealed class MatchService
                     {
                         var ids = string.Join(", ", downstream.Select(m => m.Id));
                         throw new InvalidScoreException(
+                            ErrorCodes.ScoreChangeInvalidatesDependents,
                             "Correcting this result changes the winner of an already-decided tie and " +
                             $"invalidates {downstream.Count} dependent match(es): {ids}. Resubmit with " +
-                            "confirmDependentInvalidation=true to apply this correction.");
+                            "confirmDependentInvalidation=true to apply this correction.",
+                            new Dictionary<string, object?>
+                            {
+                                ["dependentMatchCount"] = downstream.Count,
+                                ["dependentMatchIds"] = ids
+                            });
                     }
                 }
 
@@ -207,7 +215,8 @@ public sealed class MatchService
 
         var match = await _dbContext.Matches
             .FirstOrDefaultAsync(m => m.Id == matchId && m.TournamentId == tournamentId, cancellationToken)
-            ?? throw new InvalidTournamentStateException("Match not found in this tournament.");
+            ?? throw new InvalidTournamentStateException(
+                ErrorCodes.MatchNotFound, "Match not found in this tournament.");
 
         _dbContext.SetOriginalRowVersion(match, request.RowVersion);
 
@@ -238,7 +247,8 @@ public sealed class MatchService
 
         var match = await _dbContext.Matches
             .FirstOrDefaultAsync(m => m.Id == matchId && m.TournamentId == tournamentId, cancellationToken)
-            ?? throw new InvalidTournamentStateException("Match not found in this tournament.");
+            ?? throw new InvalidTournamentStateException(
+                ErrorCodes.MatchNotFound, "Match not found in this tournament.");
 
         _dbContext.SetOriginalRowVersion(match, request.RowVersion);
 

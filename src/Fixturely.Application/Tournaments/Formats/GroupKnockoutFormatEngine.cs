@@ -16,6 +16,7 @@ public sealed class GroupKnockoutFormatEngine : ITournamentFormatEngine
         if (input.NumberOfGroups is null || !AllowedGroupCounts.Contains(input.NumberOfGroups.Value))
         {
             throw new TournamentGroupCompositionException(
+                ErrorCodes.GroupKnockoutInvalidGroupCount,
                 "Group + knockout tournaments must use 2, 4, 8, or 16 groups of exactly four participants.");
         }
 

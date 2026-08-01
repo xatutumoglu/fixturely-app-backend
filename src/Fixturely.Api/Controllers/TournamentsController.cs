@@ -79,6 +79,15 @@ public sealed class TournamentsController : ControllerBase
         return NoContent();
     }
 
+    [HttpDelete("bulk")]
+    public async Task<IActionResult> DeleteBulkAsync(
+        [FromBody] BulkDeleteTournamentsRequest request,
+        CancellationToken cancellationToken)
+    {
+        await _tournamentService.DeleteBulkAsync(GetUserId(), request, cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("{tournamentId:guid}/archive")]
     public async Task<ActionResult<TournamentDetailResponse>> ArchiveAsync(
         Guid tournamentId,

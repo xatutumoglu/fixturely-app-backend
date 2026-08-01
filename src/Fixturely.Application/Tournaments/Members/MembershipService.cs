@@ -77,11 +77,13 @@ public sealed class MembershipService
 
         var member = await _dbContext.TournamentMembers
             .FirstOrDefaultAsync(m => m.Id == memberId && m.TournamentId == tournamentId, cancellationToken)
-            ?? throw new InvalidTournamentStateException("Tournament member not found.");
+            ?? throw new InvalidTournamentStateException(
+                ErrorCodes.TournamentMemberNotFound, "Tournament member not found.");
 
         if (member.Role == TournamentMemberRole.Owner)
         {
-            throw new InvalidTournamentStateException("The tournament owner's role cannot be changed.");
+            throw new InvalidTournamentStateException(
+                ErrorCodes.OwnerRoleCannotChange, "The tournament owner's role cannot be changed.");
         }
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
@@ -103,11 +105,13 @@ public sealed class MembershipService
 
         var member = await _dbContext.TournamentMembers
             .FirstOrDefaultAsync(m => m.Id == memberId && m.TournamentId == tournamentId, cancellationToken)
-            ?? throw new InvalidTournamentStateException("Tournament member not found.");
+            ?? throw new InvalidTournamentStateException(
+                ErrorCodes.TournamentMemberNotFound, "Tournament member not found.");
 
         if (member.Role == TournamentMemberRole.Owner)
         {
-            throw new InvalidTournamentStateException("The tournament owner cannot be removed.");
+            throw new InvalidTournamentStateException(
+                ErrorCodes.OwnerCannotBeRemoved, "The tournament owner cannot be removed.");
         }
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
@@ -142,7 +146,8 @@ public sealed class MembershipService
 
             if (member.Role == TournamentMemberRole.Owner)
             {
-                results.Add(new BulkRemoveResultItem(memberId, false, "The tournament owner cannot be removed."));
+                results.Add(new BulkRemoveResultItem(
+                    memberId, false, "The tournament owner cannot be removed.", ErrorCodes.OwnerCannotBeRemoved));
                 continue;
             }
 
@@ -173,7 +178,8 @@ public sealed class MembershipService
 
         if (request.Role == TournamentMemberRole.Owner)
         {
-            throw new InvitationException("A tournament cannot have more than one owner.");
+            throw new InvitationException(
+                ErrorCodes.InvitationOnlyOneOwner, "A tournament cannot have more than one owner.");
         }
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
@@ -185,7 +191,8 @@ public sealed class MembershipService
 
         if (owner is not null && string.Equals(owner.Email, normalizedEmail, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvitationException("The tournament owner cannot be invited as a member.");
+            throw new InvitationException(
+                ErrorCodes.InvitationOwnerCannotBeInvited, "The tournament owner cannot be invited as a member.");
         }
 
         var hasActiveInvitation = await _dbContext.TournamentInvitations
@@ -197,7 +204,8 @@ public sealed class MembershipService
 
         if (hasActiveInvitation)
         {
-            throw new InvitationException("There is already an active invitation for this email address.");
+            throw new InvitationException(
+                ErrorCodes.InvitationAlreadyActive, "There is already an active invitation for this email address.");
         }
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
@@ -251,7 +259,8 @@ public sealed class MembershipService
 
             if (!seenEmails.Add(email))
             {
-                results.Add(new BulkInviteResultItem(email, false, null, "Duplicate email in this batch."));
+                results.Add(new BulkInviteResultItem(
+                    email, false, null, "Duplicate email in this batch.", ErrorCodes.DuplicateEmailInBatch));
                 continue;
             }
 
@@ -264,7 +273,7 @@ public sealed class MembershipService
             }
             catch (DomainException exception)
             {
-                results.Add(new BulkInviteResultItem(email, false, null, exception.Message));
+                results.Add(new BulkInviteResultItem(email, false, null, exception.Message, exception.ErrorCode));
             }
         }
 
@@ -281,7 +290,7 @@ public sealed class MembershipService
 
         var invitation = await _dbContext.TournamentInvitations
             .FirstOrDefaultAsync(i => i.Id == invitationId && i.TournamentId == tournamentId, cancellationToken)
-            ?? throw new InvitationException("Invitation not found.");
+            ?? throw new InvitationException(ErrorCodes.InvitationNotFound, "Invitation not found.");
 
         var tournament = await _dbContext.Tournaments
             .FirstOrDefaultAsync(t => t.Id == tournamentId, cancellationToken)
@@ -319,7 +328,7 @@ public sealed class MembershipService
 
         var invitation = await _dbContext.TournamentInvitations
             .FirstOrDefaultAsync(i => i.Id == invitationId && i.TournamentId == tournamentId, cancellationToken)
-            ?? throw new InvitationException("Invitation not found.");
+            ?? throw new InvitationException(ErrorCodes.InvitationNotFound, "Invitation not found.");
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         invitation.Revoke(utcNow);
@@ -337,7 +346,7 @@ public sealed class MembershipService
         var invitation = await _dbContext.TournamentInvitations
             .AsNoTracking()
             .FirstOrDefaultAsync(i => i.TokenHash == tokenHash, cancellationToken)
-            ?? throw new InvitationException("Invitation not found or already used.");
+            ?? throw new InvitationException(ErrorCodes.InvitationNotFoundOrUsed, "Invitation not found or already used.");
 
         var tournament = await _dbContext.Tournaments
             .AsNoTracking()
@@ -351,7 +360,7 @@ public sealed class MembershipService
         CancellationToken cancellationToken = default)
     {
         var user = await _identityService.FindByIdAsync(userId, cancellationToken)
-            ?? throw new InvitationException("User not found.");
+            ?? throw new InvitationException(ErrorCodes.UserNotFound, "User not found.");
 
         var normalizedEmail = user.Email.Trim().ToLowerInvariant();
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
@@ -389,7 +398,7 @@ public sealed class MembershipService
 
         var invitation = await _dbContext.TournamentInvitations
             .FirstOrDefaultAsync(i => i.TokenHash == tokenHash, cancellationToken)
-            ?? throw new InvitationException("Invitation not found or already used.");
+            ?? throw new InvitationException(ErrorCodes.InvitationNotFoundOrUsed, "Invitation not found or already used.");
 
         await AcceptInvitationCoreAsync(invitation, acceptingUserId, cancellationToken);
     }
@@ -409,7 +418,7 @@ public sealed class MembershipService
     {
         var invitation = await _dbContext.TournamentInvitations
             .FirstOrDefaultAsync(i => i.Id == invitationId, cancellationToken)
-            ?? throw new InvitationException("Invitation not found or already used.");
+            ?? throw new InvitationException(ErrorCodes.InvitationNotFoundOrUsed, "Invitation not found or already used.");
 
         await AcceptInvitationCoreAsync(invitation, acceptingUserId, cancellationToken);
     }
@@ -420,11 +429,12 @@ public sealed class MembershipService
         CancellationToken cancellationToken)
     {
         var user = await _identityService.FindByIdAsync(acceptingUserId, cancellationToken)
-            ?? throw new InvitationException("User not found.");
+            ?? throw new InvitationException(ErrorCodes.UserNotFound, "User not found.");
 
         if (!string.Equals(user.Email, invitation.InvitedEmail, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvitationException("This invitation was issued for a different email address.");
+            throw new InvitationException(
+                ErrorCodes.InvitationEmailMismatch, "This invitation was issued for a different email address.");
         }
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;

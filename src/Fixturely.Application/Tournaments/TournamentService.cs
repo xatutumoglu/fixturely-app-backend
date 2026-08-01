@@ -142,6 +142,33 @@ public sealed class TournamentService
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Deletes every tournament in <paramref name="request"/> that exists and that the caller
+    /// owns. Mirrors ParticipantService.RemoveBulkAsync's silent-skip behavior: ids that are
+    /// unknown, already deleted, or not owned by the caller are simply skipped rather than
+    /// aborting the whole batch or reporting per-item failures - the list page only ever
+    /// surfaces the bulk-delete action for tournaments the current user owns in the first
+    /// place, so this is purely a defensive fallback, not the expected common case.
+    /// </summary>
+    public async Task DeleteBulkAsync(
+        Guid userId,
+        BulkDeleteTournamentsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+
+        var tournaments = await _dbContext.Tournaments
+            .Where(t => request.TournamentIds.Contains(t.Id) && !t.IsDeleted && t.OwnerUserId == userId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var tournament in tournaments)
+        {
+            tournament.MarkAsDeleted(utcNow);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<TournamentDetailResponse> ArchiveAsync(
         Guid tournamentId,
         Guid userId,

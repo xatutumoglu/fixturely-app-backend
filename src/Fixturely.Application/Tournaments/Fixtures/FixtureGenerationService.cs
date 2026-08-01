@@ -45,7 +45,8 @@ public sealed class FixtureGenerationService
         var history = await _dbContext.FixtureGenerationHistories
             .Where(h => h.TournamentId == tournamentId && h.GenerationNumber == tournament.CurrentFixtureGenerationNumber)
             .FirstOrDefaultAsync(cancellationToken)
-            ?? throw new InvalidFixtureGenerationException("There is no pending fixture generation to confirm.");
+            ?? throw new InvalidFixtureGenerationException(
+                ErrorCodes.NoPendingFixtureGeneration, "There is no pending fixture generation to confirm.");
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         history.Confirm(utcNow);
@@ -75,19 +76,23 @@ public sealed class FixtureGenerationService
             if (!tournament.CanRegenerateFixture())
             {
                 throw new InvalidTournamentStateException(
+                    ErrorCodes.FixtureAlreadyHasScores,
                     "The fixture cannot be regenerated once a score has been entered.");
             }
         }
         else if (tournament.Status != TournamentStatus.Setup)
         {
             throw new InvalidTournamentStateException(
+                ErrorCodes.FixtureOnlySetupStatus,
                 "The fixture can only be generated for tournaments in the Setup status.");
         }
 
         if (!_engines.TryGetValue(tournament.Format, out var engine))
         {
             throw new InvalidFixtureGenerationException(
-                $"No fixture generation engine is registered for format '{tournament.Format}'.");
+                ErrorCodes.NoEngineForFormat,
+                $"No fixture generation engine is registered for format '{tournament.Format}'.",
+                new Dictionary<string, object?> { ["format"] = tournament.Format.ToString() });
         }
 
         var participants = tournament.Participants.Where(p => !p.IsDeleted).ToList();

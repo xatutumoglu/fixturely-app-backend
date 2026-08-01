@@ -59,11 +59,41 @@ public sealed class ExceptionHandlingMiddleware
             Type = $"https://httpstatuses.io/{statusCode}"
         };
 
+        // A stable, language-agnostic identifier (see Fixturely.Domain.Exceptions.ErrorCodes)
+        // that the frontend uses to render a fully localized message for the user's active UI
+        // language, instead of the English text above (which exists purely for logs/dev tools).
+        switch (exception)
+        {
+            case DomainException domainException:
+                problemDetails.Extensions["errorCode"] = domainException.ErrorCode;
+                if (domainException.Params.Count > 0)
+                {
+                    problemDetails.Extensions["errorParams"] = domainException.Params;
+                }
+
+                break;
+            case ValidationException:
+                problemDetails.Extensions["errorCode"] = ErrorCodes.ValidationFailed;
+                break;
+            default:
+                problemDetails.Extensions["errorCode"] = ErrorCodes.UnexpectedError;
+                break;
+        }
+
+        if (exception is IdentityValidationException identityException && identityException.Codes.Count > 0)
+        {
+            problemDetails.Extensions["identityErrorCodes"] = identityException.Codes;
+        }
+
         if (exception is ValidationException fluentValidationException)
         {
             problemDetails.Extensions["errors"] = fluentValidationException.Errors
                 .GroupBy(e => e.PropertyName)
                 .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+
+            problemDetails.Extensions["errorCodes"] = fluentValidationException.Errors
+                .GroupBy(e => e.PropertyName)
+                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorCode).ToArray());
         }
 
         if (_environment.IsDevelopment() && statusCode >= 500)

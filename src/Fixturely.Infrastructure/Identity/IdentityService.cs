@@ -36,7 +36,8 @@ public sealed class IdentityService : IIdentityService
 
         return result.Succeeded
             ? (IdentityOperationResult.Success(), user.Id)
-            : (IdentityOperationResult.Failure(result.Errors.Select(e => e.Description)), null);
+            : (IdentityOperationResult.Failure(
+                result.Errors.Select(e => e.Description), result.Errors.Select(e => e.Code)), null);
     }
 
     public async Task<UserRecord?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
@@ -76,7 +77,7 @@ public sealed class IdentityService : IIdentityService
 
         if (user is null)
         {
-            return IdentityOperationResult.Failure("Invalid confirmation request.");
+            return IdentityOperationResult.Failure("Invalid confirmation request.", Fixturely.Domain.Exceptions.ErrorCodes.InvalidConfirmationRequest);
         }
 
         var result = await _userManager.ConfirmEmailAsync(user, token);
@@ -89,7 +90,7 @@ public sealed class IdentityService : IIdentityService
 
         return result.Succeeded
             ? IdentityOperationResult.Success()
-            : IdentityOperationResult.Failure(result.Errors.Select(e => e.Description));
+            : IdentityOperationResult.Failure(result.Errors.Select(e => e.Description), result.Errors.Select(e => e.Code));
     }
 
     public async Task<bool> CheckPasswordAsync(
@@ -121,7 +122,7 @@ public sealed class IdentityService : IIdentityService
 
         if (user is null)
         {
-            return IdentityOperationResult.Failure("Invalid password reset request.");
+            return IdentityOperationResult.Failure("Invalid password reset request.", Fixturely.Domain.Exceptions.ErrorCodes.InvalidPasswordResetRequest);
         }
 
         var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
@@ -134,7 +135,7 @@ public sealed class IdentityService : IIdentityService
 
         return result.Succeeded
             ? IdentityOperationResult.Success()
-            : IdentityOperationResult.Failure(result.Errors.Select(e => e.Description));
+            : IdentityOperationResult.Failure(result.Errors.Select(e => e.Description), result.Errors.Select(e => e.Code));
     }
 
     public async Task SetLastLoginAsync(Guid userId, DateTime utcNow, CancellationToken cancellationToken = default)
