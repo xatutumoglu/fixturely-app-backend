@@ -42,4 +42,5 @@ public sealed record TournamentDetailResponse(
     TournamentMemberRole CurrentUserRole,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
-    byte[] RowVersion);
+    byte[] RowVersion,
+    int? MaxParticipants);

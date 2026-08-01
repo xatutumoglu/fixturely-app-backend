@@ -47,6 +47,17 @@ public sealed class MembersController : ControllerBase
         return NoContent();
     }
 
+    [HttpDelete("members/bulk")]
+    public async Task<ActionResult<IReadOnlyCollection<BulkRemoveResultItem>>> RemoveMembersBulkAsync(
+        Guid tournamentId,
+        [FromBody] BulkRemoveMembersRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _membershipService.RemoveMembersBulkAsync(
+            tournamentId, GetUserId(), request, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpPost("invitations")]
     [EnableRateLimiting("invitation-sensitive")]
     public async Task<ActionResult<InvitationResponse>> InviteAsync(
@@ -55,6 +66,17 @@ public sealed class MembersController : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _membershipService.InviteAsync(tournamentId, GetUserId(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("invitations/bulk")]
+    [EnableRateLimiting("invitation-sensitive")]
+    public async Task<ActionResult<IReadOnlyCollection<BulkInviteResultItem>>> InviteBulkAsync(
+        Guid tournamentId,
+        BulkInviteMembersRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _membershipService.InviteBulkAsync(tournamentId, GetUserId(), request, cancellationToken);
         return Ok(result);
     }
 

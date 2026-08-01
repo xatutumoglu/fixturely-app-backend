@@ -1,5 +1,6 @@
 using Fixturely.Application.Abstractions.Persistence;
 using Fixturely.Application.Abstractions.Security;
+using Fixturely.Application.Common;
 using Fixturely.Application.DTOs.Participants;
 using Fixturely.Domain.Entities;
 using Fixturely.Domain.Exceptions;
@@ -52,6 +53,8 @@ public sealed class ParticipantService
             .FirstOrDefaultAsync(t => t.Id == tournamentId && !t.IsDeleted, cancellationToken)
             ?? throw new TournamentNotFoundException(tournamentId);
 
+        EnsureCapacityAvailable(tournament, additionalCount: 1);
+
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var participant = Participant.Create(tournamentId, request.Name, request.ShortCode, utcNow);
 
@@ -61,6 +64,91 @@ public sealed class ParticipantService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Map(participant);
+    }
+
+    public async Task<IReadOnlyCollection<ParticipantResponse>> AddBulkAsync(
+        Guid tournamentId,
+        Guid userId,
+        BulkCreateParticipantsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        await _authorizationService.EnsureIsOwnerAsync(tournamentId, userId, cancellationToken);
+
+        var tournament = await _dbContext.Tournaments
+            .Include(t => t.Participants)
+            .FirstOrDefaultAsync(t => t.Id == tournamentId && !t.IsDeleted, cancellationToken)
+            ?? throw new TournamentNotFoundException(tournamentId);
+
+        EnsureCapacityAvailable(tournament, additionalCount: request.Participants.Count);
+
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var created = new List<Participant>();
+
+        foreach (var item in request.Participants)
+        {
+            var participant = Participant.Create(tournamentId, item.Name, item.ShortCode, utcNow);
+            tournament.AddParticipant(participant);
+            _dbContext.Participants.Add(participant);
+            created.Add(participant);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return created.Select(Map).ToList();
+    }
+
+    public async Task RemoveBulkAsync(
+        Guid tournamentId,
+        Guid userId,
+        BulkDeleteParticipantsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        await _authorizationService.EnsureIsOwnerAsync(tournamentId, userId, cancellationToken);
+
+        var tournament = await _dbContext.Tournaments
+            .Include(t => t.Participants)
+            .FirstOrDefaultAsync(t => t.Id == tournamentId && !t.IsDeleted, cancellationToken)
+            ?? throw new TournamentNotFoundException(tournamentId);
+
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+
+        foreach (var participantId in request.ParticipantIds.Distinct())
+        {
+            if (!tournament.Participants.Any(p => p.Id == participantId))
+            {
+                continue;
+            }
+
+            tournament.RemoveParticipant(participantId, utcNow);
+
+            var participant = await _dbContext.Participants
+                .FirstOrDefaultAsync(p => p.Id == participantId, cancellationToken);
+            participant?.MarkDeleted(utcNow);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static void EnsureCapacityAvailable(Tournament tournament, int additionalCount)
+    {
+        var maxParticipants = ParticipantCapacity.GetMaxParticipants(tournament.Format, tournament.NumberOfGroups);
+
+        if (maxParticipants is null)
+        {
+            return;
+        }
+
+        var currentCount = tournament.Participants.Count;
+
+        if (currentCount + additionalCount > maxParticipants)
+        {
+            var remaining = Math.Max(0, maxParticipants.Value - currentCount);
+
+            throw new TournamentGroupCompositionException(
+                $"This tournament format allows at most {maxParticipants} participants " +
+                $"({tournament.NumberOfGroups} groups x {ParticipantCapacity.ParticipantsPerGroup} participants per group). " +
+                $"You can add at most {remaining} more participant(s).");
+        }
     }
 
     public async Task<ParticipantResponse> UpdateAsync(

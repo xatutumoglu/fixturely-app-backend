@@ -207,6 +207,7 @@ public sealed class TournamentService
             role,
             tournament.CreatedAtUtc,
             tournament.UpdatedAtUtc,
-            tournament.RowVersion);
+            tournament.RowVersion,
+            ParticipantCapacity.GetMaxParticipants(tournament.Format, tournament.NumberOfGroups));
     }
 }

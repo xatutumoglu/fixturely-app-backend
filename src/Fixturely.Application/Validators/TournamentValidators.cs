@@ -61,6 +61,26 @@ public sealed class UpdateParticipantRequestValidator : AbstractValidator<Update
     }
 }
 
+public sealed class BulkCreateParticipantsRequestValidator : AbstractValidator<BulkCreateParticipantsRequest>
+{
+    public BulkCreateParticipantsRequestValidator()
+    {
+        RuleFor(x => x.Participants)
+            .NotEmpty().WithMessage("At least one participant is required.")
+            .Must(p => p.Count <= 200).WithMessage("At most 200 participants can be added at once.");
+
+        RuleForEach(x => x.Participants).SetValidator(new CreateParticipantRequestValidator());
+    }
+}
+
+public sealed class BulkDeleteParticipantsRequestValidator : AbstractValidator<BulkDeleteParticipantsRequest>
+{
+    public BulkDeleteParticipantsRequestValidator()
+    {
+        RuleFor(x => x.ParticipantIds).NotEmpty().WithMessage("At least one participant id is required.");
+    }
+}
+
 public sealed class InviteMemberRequestValidator : AbstractValidator<InviteMemberRequest>
 {
     public InviteMemberRequestValidator()
@@ -79,6 +99,30 @@ public sealed class ChangeMemberRoleRequestValidator : AbstractValidator<ChangeM
         RuleFor(x => x.Role)
             .Must(r => r is TournamentMemberRole.ScoreManager or TournamentMemberRole.Viewer)
             .WithMessage("Members can only be assigned the ScoreManager or Viewer role.");
+    }
+}
+
+public sealed class BulkInviteMembersRequestValidator : AbstractValidator<BulkInviteMembersRequest>
+{
+    public BulkInviteMembersRequestValidator()
+    {
+        RuleFor(x => x.Emails)
+            .NotEmpty().WithMessage("At least one email address is required.")
+            .Must(e => e.Count <= 100).WithMessage("At most 100 invitations can be sent at once.");
+
+        RuleForEach(x => x.Emails).NotEmpty().EmailAddress();
+
+        RuleFor(x => x.Role)
+            .Must(r => r is TournamentMemberRole.ScoreManager or TournamentMemberRole.Viewer)
+            .WithMessage("Invited members must be assigned the ScoreManager or Viewer role.");
+    }
+}
+
+public sealed class BulkRemoveMembersRequestValidator : AbstractValidator<BulkRemoveMembersRequest>
+{
+    public BulkRemoveMembersRequestValidator()
+    {
+        RuleFor(x => x.MemberIds).NotEmpty().WithMessage("At least one member id is required.");
     }
 }
 

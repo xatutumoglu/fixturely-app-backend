@@ -27,3 +27,15 @@ public sealed record InvitationResponse(
     DateTime CreatedAtUtc);
 
 public sealed record AcceptInvitationRequest(string Token);
+
+public sealed record BulkInviteMembersRequest(IReadOnlyCollection<string> Emails, TournamentMemberRole Role);
+
+public sealed record BulkInviteResultItem(
+    string Email,
+    bool Success,
+    InvitationResponse? Invitation,
+    string? Error);
+
+public sealed record BulkRemoveMembersRequest(IReadOnlyCollection<Guid> MemberIds);
+
+public sealed record BulkRemoveResultItem(Guid MemberId, bool Success, string? Error);

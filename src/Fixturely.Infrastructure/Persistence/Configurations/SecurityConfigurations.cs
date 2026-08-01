@@ -1,4 +1,5 @@
 using Fixturely.Domain.Entities;
+using Fixturely.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -17,6 +18,19 @@ public sealed class TournamentInvitationConfiguration : IEntityTypeConfiguration
 
         builder.HasIndex(i => i.TokenHash).IsUnique();
         builder.HasIndex(i => new { i.TournamentId, i.InvitedEmail, i.Status });
+
+        // Only one of this table's two AspNetUsers references can carry a
+        // cascading EF-level FK: SQL Server rejects a second cascading path
+        // from the same source table into the same target table, even via a
+        // different column. AcceptedByUserId gets the (non-destructive)
+        // SetNull FK; InvitedByUserId is left unconstrained and cleaned up by
+        // the TR_AspNetUsers_CleanupTournamentMembers trigger's sibling
+        // statement in the AddUserForeignKeys migration, which deletes
+        // pending invitations sent by a deleted user.
+        builder.HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(i => i.AcceptedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 
@@ -36,6 +50,11 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
         builder.HasIndex(r => r.TokenHash).IsUnique();
         builder.HasIndex(r => r.UserId);
         builder.HasIndex(r => r.SessionId);
+
+        builder.HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -53,6 +72,11 @@ public sealed class UserSessionConfiguration : IEntityTypeConfiguration<UserSess
 
         builder.HasIndex(s => s.SessionId).IsUnique();
         builder.HasIndex(s => s.UserId);
+
+        builder.HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(s => s.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -69,6 +93,11 @@ public sealed class EmailDeliveryEventConfiguration : IEntityTypeConfiguration<E
 
         builder.HasIndex(e => e.UserId);
         builder.HasIndex(e => e.AttemptedAtUtc);
+
+        builder.HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(e => e.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 
@@ -89,5 +118,10 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.HasIndex(a => a.TournamentId);
         builder.HasIndex(a => a.UserId);
         builder.HasIndex(a => a.OccurredAtUtc);
+
+        builder.HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(a => a.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

@@ -59,6 +59,14 @@ public sealed class InvitationException : DomainException
     }
 }
 
+public sealed class UserNotRegisteredException : DomainException
+{
+    public UserNotRegisteredException(string email)
+        : base($"No Fixturely account was found for '{email}'. Ask them to register first, then try inviting again.")
+    {
+    }
+}
+
 public sealed class ConcurrencyConflictException : DomainException
 {
     public ConcurrencyConflictException(string message) : base(message)

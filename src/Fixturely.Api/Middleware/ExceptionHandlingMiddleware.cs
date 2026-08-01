@@ -93,6 +93,7 @@ public sealed class ExceptionHandlingMiddleware
         InvalidTournamentStateException => ((int)HttpStatusCode.BadRequest, "Invalid tournament state"),
         ParticipantAlreadyExistsException => ((int)HttpStatusCode.BadRequest, "Participant already exists"),
         InvitationException => ((int)HttpStatusCode.BadRequest, "Invitation error"),
+        UserNotRegisteredException => ((int)HttpStatusCode.NotFound, "Recipient not registered"),
         TournamentGroupCompositionException => ((int)HttpStatusCode.BadRequest, "Invalid group composition"),
         KnockoutPairingException => ((int)HttpStatusCode.BadRequest, "Invalid knockout pairing"),
         DomainException => ((int)HttpStatusCode.BadRequest, "Request failed"),

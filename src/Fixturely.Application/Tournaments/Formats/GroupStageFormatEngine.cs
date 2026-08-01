@@ -76,7 +76,7 @@ public sealed class GroupStageFormatEngine : ITournamentFormatEngine
 
 internal static class GroupDrawHelper
 {
-    public const int ParticipantsPerGroup = 4;
+    public const int ParticipantsPerGroup = Fixturely.Application.Common.ParticipantCapacity.ParticipantsPerGroup;
 
     public static (List<TournamentGroup> Groups, Dictionary<Guid, List<Guid>> Assignments) DrawGroups(
         FixtureGenerationInput input)

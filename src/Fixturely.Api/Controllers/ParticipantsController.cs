@@ -35,6 +35,26 @@ public sealed class ParticipantsController : ControllerBase
         return CreatedAtAction("List", new { tournamentId }, result);
     }
 
+    [HttpPost("bulk")]
+    public async Task<ActionResult<IReadOnlyCollection<ParticipantResponse>>> AddBulkAsync(
+        Guid tournamentId,
+        BulkCreateParticipantsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _participantService.AddBulkAsync(tournamentId, GetUserId(), request, cancellationToken);
+        return CreatedAtAction("List", new { tournamentId }, result);
+    }
+
+    [HttpDelete("bulk")]
+    public async Task<IActionResult> RemoveBulkAsync(
+        Guid tournamentId,
+        [FromBody] BulkDeleteParticipantsRequest request,
+        CancellationToken cancellationToken)
+    {
+        await _participantService.RemoveBulkAsync(tournamentId, GetUserId(), request, cancellationToken);
+        return NoContent();
+    }
+
     [HttpPut("{participantId:guid}")]
     public async Task<ActionResult<ParticipantResponse>> UpdateAsync(
         Guid tournamentId,

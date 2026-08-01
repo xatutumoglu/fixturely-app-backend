@@ -30,7 +30,7 @@ token is transported exclusively via a `fixturely_refresh_token` `HttpOnly` cook
 |--------|------|--------------|--------------|
 | GET    | `/tournaments` | JWT (member) | Paginated list of tournaments the user owns or is a member of. |
 | POST   | `/tournaments` | JWT | Create tournament (caller becomes Owner). |
-| GET    | `/tournaments/{tournamentId}` | Viewer+ | Tournament detail, includes `RowVersion` and caller's role. |
+| GET    | `/tournaments/{tournamentId}` | Viewer+ | Tournament detail, includes `RowVersion`, caller's role, and `MaxParticipants` (see below). |
 | PUT    | `/tournaments/{tournamentId}` | Owner | Update settings; requires `RowVersion` (409 on stale write). |
 | DELETE | `/tournaments/{tournamentId}` | Owner | Soft-delete. |
 | POST   | `/tournaments/{tournamentId}/archive` | Owner | Make read-only. |
@@ -44,14 +44,23 @@ token is transported exclusively via a `fixturely_refresh_token` `HttpOnly` cook
 | GET    | `/tournaments/{tournamentId}/rounds` | Viewer+ | All rounds (league/group/knockout/final/third-place). |
 | GET    | `/tournaments/{tournamentId}/audit-logs` | Viewer+ | Recent audit log entries (most recent 200). |
 
+`MaxParticipants` (nullable `int`) on the tournament detail response is `NumberOfGroups * 4` for
+**Group stage** and **Group + Knockout** formats (their fixture engine requires groups of exactly
+four), and `null` for **League**/**Knockout**, which accept any participant count ≥ 2. The
+participant-add and bulk-add endpoints below enforce this same limit server-side
+(`400 TournamentGroupCompositionException` if exceeded) — clients should treat `MaxParticipants`
+as informational only, never as the sole guard.
+
 ## Participants (`/api/v1/tournaments/{tournamentId}/participants`)
 
 | Method | Path | Auth / Role | Description |
 |--------|------|--------------|--------------|
 | GET    | `/participants` | Viewer+ | List active participants. |
-| POST   | `/participants` | Owner | Add participant (unique name per tournament). |
+| POST   | `/participants` | Owner | Add one participant (unique name per tournament); rejected once `MaxParticipants` would be exceeded. |
+| POST   | `/participants/bulk` | Owner | Add up to 200 participants in a single call (`{ participants: [{name, shortCode}, ...] }`); all-or-nothing — a name collision or capacity overflow fails the entire batch, no partial insert. |
 | PUT    | `/participants/{participantId}` | Owner | Rename / update short code. |
 | DELETE | `/participants/{participantId}` | Owner | Soft-delete. |
+| DELETE | `/participants/bulk` | Owner | Soft-delete many at once (`{ participantIds: [...] }`); unknown ids are silently skipped, never an error. |
 
 ## Members and invitations
 
@@ -60,7 +69,9 @@ token is transported exclusively via a `fixturely_refresh_token` `HttpOnly` cook
 | GET    | `/tournaments/{tournamentId}/members` | Viewer+ | List active members with role. |
 | PUT    | `/tournaments/{tournamentId}/members/{memberId}/role` | Owner | Change role (ScoreManager/Viewer only). |
 | DELETE | `/tournaments/{tournamentId}/members/{memberId}` | Owner | Remove member. |
+| DELETE | `/tournaments/{tournamentId}/members/bulk` | Owner | Remove many members at once (`{ memberIds: [...] }`); returns a `200` array with one `{memberId, success, error}` result per id — e.g. attempting to remove the Owner fails just that entry, the rest still succeed. |
 | POST   | `/tournaments/{tournamentId}/invitations` | Owner (rate-limited) | Invite by email + role. |
+| POST   | `/tournaments/{tournamentId}/invitations/bulk` | Owner (rate-limited) | Invite up to 100 emails at once with one shared role (`{ emails: [...], role }`); returns a `200` array with one `{email, success, invitation, error}` result per address — an unregistered or duplicate email fails only its own entry. |
 | POST   | `/tournaments/{tournamentId}/invitations/{invitationId}/resend` | Owner (rate-limited) | Resend, rotates token. |
 | DELETE | `/tournaments/{tournamentId}/invitations/{invitationId}` | Owner | Revoke pending invitation. |
 | GET    | `/invitations/{token}` | none (rate-limited) | Inspect an invitation before accepting. |

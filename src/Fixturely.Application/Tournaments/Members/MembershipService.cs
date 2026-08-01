@@ -119,6 +119,46 @@ public sealed class MembershipService
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<BulkRemoveResultItem>> RemoveMembersBulkAsync(
+        Guid tournamentId,
+        Guid actingUserId,
+        BulkRemoveMembersRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        await _authorizationService.EnsureIsOwnerAsync(tournamentId, actingUserId, cancellationToken);
+
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var results = new List<BulkRemoveResultItem>();
+
+        foreach (var memberId in request.MemberIds.Distinct())
+        {
+            var member = await _dbContext.TournamentMembers
+                .FirstOrDefaultAsync(m => m.Id == memberId && m.TournamentId == tournamentId, cancellationToken);
+
+            if (member is null)
+            {
+                continue;
+            }
+
+            if (member.Role == TournamentMemberRole.Owner)
+            {
+                results.Add(new BulkRemoveResultItem(memberId, false, "The tournament owner cannot be removed."));
+                continue;
+            }
+
+            member.Remove(utcNow);
+
+            _dbContext.AuditLogs.Add(AuditLog.Create(
+                actingUserId, tournamentId, "Membership", "MemberRemoved", null, null, null, utcNow));
+
+            results.Add(new BulkRemoveResultItem(memberId, true, null));
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return results;
+    }
+
     public async Task<InvitationResponse> InviteAsync(
         Guid tournamentId,
         Guid ownerUserId,
@@ -137,6 +177,10 @@ public sealed class MembershipService
         }
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+
+        var recipient = await _identityService.FindByEmailAsync(normalizedEmail, cancellationToken)
+            ?? throw new UserNotRegisteredException(normalizedEmail);
+
         var owner = await _identityService.FindByIdAsync(ownerUserId, cancellationToken);
 
         if (owner is not null && string.Equals(owner.Email, normalizedEmail, StringComparison.OrdinalIgnoreCase))
@@ -179,6 +223,52 @@ public sealed class MembershipService
             cancellationToken);
 
         return MapInvitation(invitation, tournament.Name);
+    }
+
+    /// <summary>
+    /// Invites many recipients in one call, processing each email independently through
+    /// <see cref="InviteAsync"/> so a bad email (unregistered account, duplicate active
+    /// invitation, etc.) never aborts the rest of the batch - the caller gets a per-email
+    /// success/failure breakdown instead.
+    /// </summary>
+    public async Task<IReadOnlyCollection<BulkInviteResultItem>> InviteBulkAsync(
+        Guid tournamentId,
+        Guid ownerUserId,
+        BulkInviteMembersRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var results = new List<BulkInviteResultItem>();
+        var seenEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var rawEmail in request.Emails)
+        {
+            var email = rawEmail.Trim();
+
+            if (email.Length == 0)
+            {
+                continue;
+            }
+
+            if (!seenEmails.Add(email))
+            {
+                results.Add(new BulkInviteResultItem(email, false, null, "Duplicate email in this batch."));
+                continue;
+            }
+
+            try
+            {
+                var invitation = await InviteAsync(
+                    tournamentId, ownerUserId, new InviteMemberRequest(email, request.Role), cancellationToken);
+
+                results.Add(new BulkInviteResultItem(email, true, invitation, null));
+            }
+            catch (DomainException exception)
+            {
+                results.Add(new BulkInviteResultItem(email, false, null, exception.Message));
+            }
+        }
+
+        return results;
     }
 
     public async Task ResendInvitationAsync(
@@ -256,6 +346,40 @@ public sealed class MembershipService
         return MapInvitation(invitation, tournament?.Name ?? string.Empty);
     }
 
+    public async Task<IReadOnlyCollection<InvitationResponse>> ListMyInvitationsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _identityService.FindByIdAsync(userId, cancellationToken)
+            ?? throw new InvitationException("User not found.");
+
+        var normalizedEmail = user.Email.Trim().ToLowerInvariant();
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+
+        var invitations = await _dbContext.TournamentInvitations
+            .AsNoTracking()
+            .Where(i => i.InvitedEmail == normalizedEmail
+                && i.Status == InvitationStatus.Pending
+                && i.ExpiresAtUtc >= utcNow)
+            .OrderByDescending(i => i.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        if (invitations.Count == 0)
+        {
+            return Array.Empty<InvitationResponse>();
+        }
+
+        var tournamentIds = invitations.Select(i => i.TournamentId).Distinct().ToList();
+        var tournamentNames = await _dbContext.Tournaments
+            .AsNoTracking()
+            .Where(t => tournamentIds.Contains(t.Id))
+            .ToDictionaryAsync(t => t.Id, t => t.Name, cancellationToken);
+
+        return invitations
+            .Select(i => MapInvitation(i, tournamentNames.GetValueOrDefault(i.TournamentId, string.Empty)))
+            .ToList();
+    }
+
     public async Task AcceptInvitationAsync(
         string token,
         Guid acceptingUserId,
@@ -267,6 +391,34 @@ public sealed class MembershipService
             .FirstOrDefaultAsync(i => i.TokenHash == tokenHash, cancellationToken)
             ?? throw new InvitationException("Invitation not found or already used.");
 
+        await AcceptInvitationCoreAsync(invitation, acceptingUserId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Accepts an invitation the caller already knows the id of (surfaced via
+    /// <see cref="ListMyInvitationsAsync"/>), without requiring the raw email-link token. This is
+    /// safe precisely because the invitation is only ever discoverable through
+    /// <see cref="ListMyInvitationsAsync"/>, which itself is scoped to the authenticated caller's
+    /// own verified account email (never a client-supplied email) - so no new enumeration surface
+    /// is introduced versus the token-based flow.
+    /// </summary>
+    public async Task AcceptMyInvitationAsync(
+        Guid invitationId,
+        Guid acceptingUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var invitation = await _dbContext.TournamentInvitations
+            .FirstOrDefaultAsync(i => i.Id == invitationId, cancellationToken)
+            ?? throw new InvitationException("Invitation not found or already used.");
+
+        await AcceptInvitationCoreAsync(invitation, acceptingUserId, cancellationToken);
+    }
+
+    private async Task AcceptInvitationCoreAsync(
+        TournamentInvitation invitation,
+        Guid acceptingUserId,
+        CancellationToken cancellationToken)
+    {
         var user = await _identityService.FindByIdAsync(acceptingUserId, cancellationToken)
             ?? throw new InvitationException("User not found.");
 
